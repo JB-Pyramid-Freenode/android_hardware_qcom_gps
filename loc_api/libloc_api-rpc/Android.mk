@@ -8,6 +8,9 @@
 
 ifneq ($(BUILD_TINY_ANDROID),true)
 
+$(shell mkdir -p $(OUT)/obj/STATIC_LIBRARIES/libcommondefs-rpc_intermediates/)
+$(shell touch $(OUT)/obj/STATIC_LIBRARIES/libcommondefs-rpc_intermediates/export_includes)
+
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -22,7 +25,8 @@ generated_files:= \
 	gen-$(AMSS_VERSION)/loc_api_xdr.c \
 	gen-$(AMSS_VERSION)/loc_api_fixup.c \
 	gen-$(AMSS_VERSION)/loc_api_rpc_glue.c \
-	src/loc_apicb_appinit.c
+	src/loc_apicb_appinit.c \
+	src/loc_api_sync_call.c
 
 LOCAL_SRC_FILES:= $(generated_files)
 
@@ -49,7 +53,8 @@ LOCAL_COPY_HEADERS:= \
 	$(RPC_INC)/loc_api_fixup.h \
 	$(RPC_INC)/loc_apicb_appinit.h \
 	inc/debug.h \
-	inc/loc_api_rpc_glue.h
+	inc/loc_api_rpc_glue.h \
+	inc/loc_api_sync_call.h
 
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH) \
@@ -59,6 +64,8 @@ LOCAL_C_INCLUDES:= \
 	$(TARGET_OUT_HEADERS)/librpc
 
 LOCAL_MODULE:= libloc_api-rpc
+
+LOCAL_MODULE_TAGS := optional
 
 include $(BUILD_STATIC_LIBRARY)
 

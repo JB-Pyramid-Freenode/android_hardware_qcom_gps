@@ -55,6 +55,7 @@ when       who      what, where, why
 
 #include <rpc/rpc.h>
 #include <rpc/clnt.h>
+#include "loc_api_sync_call.h"
 
 /* Include RPC headers */
 #include "loc_api_rpc_glue.h"
@@ -67,8 +68,8 @@ when       who      what, where, why
 #include <utils/Log.h>
 
 /* Comment this out to enable logging */
-#undef ALOGD
-#define ALOGD(...) {}
+#undef LOGD
+#define LOGD(...) {}
 
 /*=====================================================================
      External declarations
@@ -99,17 +100,17 @@ bool_t rpc_loc_event_cb_f_type_0x00040001_svc(
     /* Callback not registered, or unexpected ID (shouldn't happen) */
     if (loc_api_saved_cb == NULL || argp->cb_id != LOC_API_CB_ID)
     {
-        ALOGD("Warning: No callback handler.\n");
+        LOGD("Warning: No callback handler.\n");
         ret->loc_event_cb_f_type_result = 0;
         return 1; /* simply return */
     }
 
-    ALOGD("proc: %x  prog: %x  vers: %x\n",
+    LOGD("proc: %x  prog: %x  vers: %x\n",
             (int) req->rq_proc,
             (int) req->rq_prog,
             (int) req->rq_vers);
 
-    ALOGD("Callback received: %x (handle=%d ret_ptr=%d)\n",
+    LOGD("Callback received: %x (handle=%d ret_ptr=%d)\n",
             (int) argp->loc_event,
             (int) argp->loc_handle,
             (int) ret);
@@ -119,6 +120,9 @@ bool_t rpc_loc_event_cb_f_type_0x00040001_svc(
     rpc_loc_event_mask_type           loc_event  = argp->loc_event;
     const rpc_loc_event_payload_u_type*  loc_event_payload =
         (const rpc_loc_event_payload_u_type*) argp->loc_event_payload;
+
+    /* Gives control to synchronous call handler */
+    loc_api_callback_process_sync_call(loc_handle, loc_event, loc_event_payload);
 
     int32 rc = loc_api_saved_cb(loc_handle, loc_event, loc_event_payload);
     ret->loc_event_cb_f_type_result = rc;
@@ -133,7 +137,7 @@ int loc_apicbprog_freeresult (SVCXPRT *transp, xdrproc_t xdr_result, caddr_t res
     /*
      * Insert additional freeing code here, if needed
      */
-    // ALOGD("***** loc_apicbprog_freeresult\n");
+    // LOGD("***** loc_apicbprog_freeresult\n");
 
     return 1;
 }
@@ -160,9 +164,9 @@ int loc_api_glue_init(void)
     if (loc_api_clnt == NULL)
     {
         /* Print msg */
-        ALOGD("Trying to create RPC client...\n");
+        LOGD("Trying to create RPC client...\n");
         loc_api_clnt = clnt_create(NULL, LOC_APIPROG, LOC_APIVERS, NULL);
-        ALOGD("Created loc_api_clnt ---- %x\n", (unsigned int)loc_api_clnt);
+        LOGD("Created loc_api_clnt ---- %x\n", (unsigned int)loc_api_clnt);
 
         if (loc_api_clnt == NULL)
         {
@@ -171,10 +175,12 @@ int loc_api_glue_init(void)
         }
 
         /* Init RPC callbacks */
+        loc_api_sync_call_init();
+
         int rc = loc_apicb_app_init();
         if (rc >= 0)
         {
-            ALOGD("Loc API callback initialized.\n");
+            LOGD("Loc API callback initialized.\n");
         } else {
             fprintf(stderr, "Loc API callback initialization failed.\n");
             return 0;
@@ -217,6 +223,11 @@ int32 loc_close(rpc_loc_client_handle_type handle)
 
     stat = RPC_FUNC_VERSION(rpc_loc_close_, /* LOC_APIVERS */ 0x00040001)(&args, &rets, loc_api_clnt);
     LOC_GLUE_CHECK_RESULT(stat, int32);
+
+    if (loc_api_clnt != NULL)
+        clnt_destroy(loc_api_clnt);
+
+    loc_api_clnt = NULL;
 
     return (int32) rets.loc_close_result;
 }
